@@ -11,6 +11,11 @@ private:
 	DList<Client*>	_clientList;
 	IFrame*			_frame;
 	byte			_currentIDWillBeSupply;
+	uint64_t		_currentWritingPipe;
+protected:
+	uint64_t getCurrentWritingPipe() const {
+		return _currentWritingPipe;
+	}
 public:
 	Server(uint64_t pipe, int cePin, int csnPin): _currentIDWillBeSupply(2), INetwork(cePin, csnPin) {
 		INetwork::setPipe(pipe);
@@ -28,7 +33,8 @@ public:
 		INetwork::setup();
 		RF24::openReadingPipe(1, getPipe());
 		RF24::startListening(); 
-		RF24::openWritingPipe(PIPE_FOR_REQUEST_ID);
+		_currentWritingPipe = PIPE_FOR_REQUEST_ID;
+		RF24::openWritingPipe(_currentWritingPipe);
 	}
 	
 	
@@ -55,7 +61,7 @@ public:
 		delete[]marked;
 	}
 	
-	void recRequestFromRouterProcess() {
+	void recRequestFromClientProcess() {
 		if (DEBUG) Serial.println(F("Rev REQUEST feedback"));
 		if (!_clientList.canAdd()) {
 			if (DEBUG) Serial.println(F("We reached the max, we can't add more"));
@@ -79,16 +85,52 @@ public:
 		Client *client = new Client(newID, newPipe);
 		_clientList.push_back(client);
 		findNewIDForNextSupply();
+		
+		Accept accept(getHeaderOfPipe(), getCodeOfPipe(), newID, newPipe);
+		INetwork::writeFrame(&accept);
+	}
+	
+	void recSensorFromClientProcess() {
+		if (DEBUG) Serial.println(F("Rev SENSOR frame!"));
+		if (_frame->getNodeIDRev() == 1) {
+			if (DEBUG) Serial.println(F("Send SENSOR command to controller!"));
+			Sensor *sensor = (Sensor *)_frame;
+			sensor->printCommandline();
+		} else {
+			//need to code
+		}		
+	}
+	
+	void recDeviceFromClientProcess() {
+		if (DEBUG) Serial.println(F("Rev DEVICE frame!"));
+		
 	}
 
 	void listening() {
 		if (INetwork::readFrame(_frame)) {
+			if (_frame->getRouterID() != ROUTER_ID)
+				if (DEBUG)
+					Serial.println(F("Repeat to other router!"));
 			switch (_frame->getProtocol()) {
 				case PROTOCOL_REQUEST_TYPE:
-					recRequestFromRouterProcess();
+					recRequestFromClientProcess();
+					break;
+				case PROTOCOL_SENSOR_TYPE:
+					recSensorFromClientProcess();
+					break;
+				case PROTOCOL_DEVICE_TYPE:
+					recDeviceFromClientProcess();
 					break;
 			}
 		}
+	}
+	
+	void writeFrameRemember(IFrame *frame, uint64_t pipe) {
+		if (DEBUG)
+			Serial.println(F("Write frame and remember"));
+		_currentWritingPipe = pipe;
+		RF24::openWritingPipe(_currentWritingPipe);
+		writeFrame(frame);
 	}
 		
 	virtual void writeFrame(IFrame *frame) {
@@ -96,9 +138,25 @@ public:
 		INetwork::writeFrame(frame);
 	}
 	
+	bool sendToNode(byte nodeID, IFrame *frame) {
+		for (int i = 0; i < _clientList.size(); i++)
+			if (_clientList.at(i)->obj->getID() == nodeID) {
+				if (DEBUG) {
+					Serial.print(F("Send to node "));
+					Serial.println(nodeID);
+				}
+				frame->setCodeOfPipe(getCodeOfPipe());
+				writeFrameRemember(frame, _clientList.at(i)->obj->getPipe());
+				return true;
+			}
+		return false;
+	}
+	
 	void broastcasting() {
 		Request request(getHeaderOfPipe(), getCodeOfPipe(), _currentIDWillBeSupply);
-		writeFrame(&request);
+		RF24::openWritingPipe(PIPE_FOR_REQUEST_ID);
+		INetwork::writeFrame(&request);
+		RF24::openWritingPipe(_currentWritingPipe);
 	}
 };
 

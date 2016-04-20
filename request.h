@@ -20,13 +20,12 @@ public:
 		uint64_t pipe = headerOfPipe;
 		pipe <<= 24;
 		pipe |= codeOfPipe;
-		char data[8];
+		char data[7];
 		data[0] = ROUTER_ID;
 		data[1] = newID;
 		for (byte i = 0; i < 5; i++)
 			data[6 - i] = (pipe >> (8 * i)) & 0b11111111;
-		data[7] = 0;
-		IFrame::setData(data, 8);
+		IFrame::setData(data, sizeof(data));
 		IFrame::setNodeIDRev(0);		//0 - means anomyous
 	}
 	virtual void setOptional() {}	//do nothing

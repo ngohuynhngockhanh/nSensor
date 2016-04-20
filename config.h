@@ -10,5 +10,8 @@
 
 //PROTOCOL DEFINE
 #define PROTOCOL_REQUEST_TYPE					1
+#define PROTOCOL_ACCEPT_TYPE					2
+#define PROTOCOL_SENSOR_TYPE					3
+#define PROTOCOL_DEVICE_TYPE					4
 
 #endif

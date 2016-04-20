@@ -25,7 +25,12 @@ public:
 	
 	//three last code of pipe
 	unsigned long getCodeOfPipe() const {
-		unsigned long pipe = (_buffer[4] << 16) | (_buffer[3] << 8) || (_buffer[2]);
+		uint64_t pipe = 0;
+		pipe |= (byte)_buffer[4];
+		pipe <<= 8;
+		pipe |= (byte)_buffer[3];
+		pipe <<= 8;
+		pipe |= (byte)_buffer[2];
 		return pipe;
 	}
 	
@@ -130,12 +135,17 @@ public:
 		_buffer[18] = nodeID;
 	}
 	
-	byte getNodeIDRec() const {
+	byte getNodeIDRev() const {
 		return _buffer[18];
 	}
 
 	const char* getBuffer() const {
 		return _buffer;
+	}
+	
+	void setOptional(word data) {
+		_buffer[18] = data >> 8;
+		_buffer[19] = data & 0b11111111;
 	}
 	
 	virtual void setOptional() {}
@@ -163,9 +173,64 @@ public:
 	}
 	
 	char getDataAt(byte i) const {
-		if (i >= 0 && i <= 7) {
+		if (i >= 0 && i < getDataLength()) {
 			return _buffer[9 + i];
 		} return 0;
+	}
+	
+	char* getData() const {
+		char *source = new char[getDataLength()];
+		for (byte i = 0; i < getDataLength(); i++)
+			source[i] = getDataAt(i);
+		return source;
+	}
+	
+	void printInfoForDebug() const {
+		if (DEBUG) {
+			Serial.print(F("Router ID: "));
+			Serial.println((byte)getRouterID(), BIN);
+			Serial.print(F("Node ID: "));
+			Serial.println((byte)getNodeID(), BIN);
+			Serial.print(F("Code Of pipe: "));
+			Serial.print(long(getCodeOfPipe()), HEX);
+			Serial.println();
+			Serial.print(F("Hop Count: "));
+			Serial.println((byte)getHopCount(), BIN);
+			Serial.print(F("Protocol: "));
+			Serial.println((byte)getProtocol(), HEX);
+			if (isTCP()) 
+				Serial.println(F("TCP"));
+			else
+				Serial.println(F("UCP"));
+			if (isMoreFragment())
+				Serial.println(F("More Fragment"));
+			else 
+				Serial.println(F("No more fragment"));
+			Serial.print(F("Fragment offset :"));
+			Serial.println((byte)getFragmentOffset(), BIN);
+			Serial.print(F("Data length: "));
+			Serial.println(getDataLength());
+			Serial.print(F("Data checksum: "));
+			if (checkVirifiedData())
+				Serial.println(F("PASS"));
+			else {
+				for (int i = 0; i < getDataLength() ; i++) {
+					Serial.print(F("Checksum at "));
+					Serial.print(i);
+					Serial.print(F(": "));
+					Serial.println((byte)getChecksumAt(i));
+				}
+			}
+			Serial.println(F("Data"));
+			for (int i = 0; i < getDataLength(); i++) {
+				Serial.print(F("Data at "));
+				Serial.print(i);
+				Serial.print(F(": "));
+				Serial.println((byte)getDataAt(i));
+			}
+			Serial.print(F("Node ID Rev: "));
+			Serial.println((byte)getNodeIDRev(), BIN);
+		}
 	}
 };
 #endif
