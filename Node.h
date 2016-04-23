@@ -72,21 +72,35 @@ public:
 		if (nodeID != 0 && getPipe() != PIPE_FOR_REQUEST_ID) {//restore state
 			setNodeID(nodeID);
 			setActive();
-			Serial.print(F("NodeID = "));
-			Serial.println(nodeID);
-			if (DEBUG)
+			
+			uint64_t routerPipe = EEPROM.readByte(6);
+			routerPipe <<= 32;
+			routerPipe |= (uint64_t)EEPROM.readLong(7);
+			if (DEBUG) {
+				Serial.print(F("NodeID = "));
+				Serial.println(nodeID);
+				Serial.print((long)getHeaderOfPipe(routerPipe), HEX);
+				Serial.println((long)getCodeOfPipe(routerPipe), HEX);
+				_routerPipe = routerPipe;
+				RF24::openWritingPipe(_routerPipe);
 				Serial.println(F("RESTORE old status"));
+			}
+				
 		}
 	}
 	
 	virtual void saveEEPROM() {
 		INetwork::saveEEPROM();
 		EEPROM.writeByte(5, _nodeID);
+		EEPROM.writeByte(6, byte(_routerPipe >> 32));
+		EEPROM.writeLong(7, _routerPipe & 0xFFFFFFFFLL);
 	}
 	
 	virtual void removeEEPROM() {
 		INetwork::removeEEPROM();
 		EEPROM.writeByte(5, 0);
+		EEPROM.writeByte(6, 0);
+		EEPROM.writeLong(7, 0);
 	}
 	
 	void recRequestFromRouterProcess() {
