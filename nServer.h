@@ -150,6 +150,8 @@ public:
 		if (DEBUG)
 			Serial.println(F("Write frame and remember"));
 		_currentWritingPipe = pipe;
+		Serial.print((long)getHeaderOfPipe(pipe), HEX);
+		Serial.println((long)getCodeOfPipe(pipe), HEX);
 		RF24::openWritingPipe(_currentWritingPipe);
 		writeFrame(frame);
 	}

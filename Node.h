@@ -81,6 +81,8 @@ public:
 				Serial.println(nodeID);
 				Serial.print((long)getHeaderOfPipe(routerPipe), HEX);
 				Serial.println((long)getCodeOfPipe(routerPipe), HEX);
+				Serial.print((long)getHeaderOfPipe(getPipe()), HEX);
+				Serial.println((long)getCodeOfPipe(getPipe()), HEX);
 				_routerPipe = routerPipe;
 				RF24::openWritingPipe(_routerPipe);
 				Serial.println(F("RESTORE old status"));
