@@ -7,6 +7,7 @@
 #define ROUTER_ID								1		   // router id
 #define MAX_CLIENT_NUMBER						50
 #define DEBUG									1
+#define RESET_PIN								8
 
 //PROTOCOL DEFINE
 #define PROTOCOL_REQUEST_TYPE					1

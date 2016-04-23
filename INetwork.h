@@ -3,11 +3,16 @@
 #include<Arduino.h>
 #include <SPI.h>
 #include <RF24.h>
+#include <EEPROMex.h>
 #include "config.h"
 #include "IFrame.h"
+#include "FallingButton.h"
+
+void(* resetFunc) (void) = 0; //declare reset function @ address 0
 class INetwork: public RF24 {
 private:
-	uint64_t	_pipe;
+	uint64_t		_pipe;
+	FallingButton	buttonReset;
 protected:
 	void setPipe(uint64_t pipe) {
 		_pipe = pipe;
@@ -15,28 +20,46 @@ protected:
 	
 	void setup() {
 		//Init radio
-		RF24::begin();	 	
+		if (DEBUG) Serial.println(F("EEPROM is ready!")); 	
 		RF24::setAutoAck(1);	
 		RF24::setRetries(3, 3);
 		RF24::setDataRate(RF24_1MBPS);		// Tốc độ truyền
 		
+		uint64_t pipe = EEPROM.readByte(0);
+		pipe <<= 32;
+		pipe |= (uint64_t)EEPROM.readLong(1);
+		if (pipe != 0) {
+			setPipe(pipe);
+			RF24::openReadingPipe(1, pipe);
+		} 
 	}
 
 	
 public:
 	INetwork(int cePin, int csnPin): RF24(cePin, csnPin) {
-		
+		buttonReset = FallingButton(RESET_PIN);
+	}
+	
+	void resetWork() {
+		if (buttonReset.check()) {
+			if (DEBUG)
+				Serial.println(F("Reseting"));
+			//remove eeprom
+			removeEEPROM();
+			delay(1000);
+			resetFunc();
+		}
 	}
 	
 	unsigned long getCodeOfPipe() const {
-		uint64_t mask = 0xFFFFFF;
+		uint64_t mask = 0xFFFFFFL;
 		unsigned long res = getPipe() & mask;
 		return res;
 	}
 	
 	unsigned long getCodeOfPipe(uint64_t pipe) const {
-		uint64_t mask = 0xFFFFFF;
-		unsigned long res = pipe & mask;
+		uint64_t mask = 0xFFFFFFL;
+		long res = pipe & mask;
 		return res;
 	}
 	
@@ -86,8 +109,22 @@ public:
 	}
 	
 	uint64_t makePipeFromCodeOfPipe(uint64_t routerPipe, unsigned long codeOfPipe) const {
-		routerPipe |= (uint64_t)codeOfPipe;
-		return routerPipe;
+		uint64_t code = codeOfPipe;
+		uint64_t res = (long)routerPipe;
+		res >>= 24;
+		res <<= 24;
+		res |= code;
+		return res;
+	}
+	
+	virtual void saveEEPROM() {
+		EEPROM.writeByte(0, byte(_pipe >> 32));
+		EEPROM.writeLong(1, _pipe & 0xFFFFFFFFLL);
+	}
+	
+	virtual void removeEEPROM() {
+		EEPROM.writeByte(0, 0);
+		EEPROM.writeLong(1, 0);
 	}
 };
 #endif

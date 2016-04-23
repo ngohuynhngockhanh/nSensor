@@ -19,8 +19,17 @@ protected:
 	void setActive() {
 		_isActive = true;
 	}
+	
+	void setDeactuve() {
+		_isActive = false;
+	}
+	
+	void setNodeID(byte nodeID) {
+		_nodeID = nodeID;
+	}
 public:
 	nNode(int cePin, int csnPin): _isSetTrigger(false), _nodeID(0), INetwork(cePin, csnPin) {
+		setPipe(PIPE_FOR_REQUEST_ID);
 		_frame = new IFrame();
 	}
 	
@@ -54,20 +63,51 @@ public:
 	}
 	
 	void setup() {
-		INetwork::setup();
-		RF24::openReadingPipe(1, PIPE_FOR_REQUEST_ID);
+		RF24::begin();	
+		RF24::openReadingPipe(1, getPipe());
+		INetwork::setup();		
 		RF24::startListening(); 
+		
+		byte nodeID = EEPROM.readByte(5);
+		if (nodeID != 0 && getPipe() != PIPE_FOR_REQUEST_ID) {//restore state
+			setNodeID(nodeID);
+			setActive();
+			Serial.print(F("NodeID = "));
+			Serial.println(nodeID);
+			if (DEBUG)
+				Serial.println(F("RESTORE old status"));
+		}
+	}
+	
+	virtual void saveEEPROM() {
+		INetwork::saveEEPROM();
+		EEPROM.writeByte(5, _nodeID);
+	}
+	
+	virtual void removeEEPROM() {
+		INetwork::removeEEPROM();
+		EEPROM.writeByte(5, 0);
 	}
 	
 	void recRequestFromRouterProcess() {
 		if (!isActive()) {
 			delay(5);//magic code!
-			if (DEBUG) Serial.println(F("Send REQUEST feedback"));
+			if (DEBUG) {
+				Serial.println(F("Send REQUEST feedback"));
+				Serial.println(_nodeID);
+				Serial.println((long)getCodeOfPipe());
+			}
 			Request *request = (Request*)_frame;
 			byte 		routerID	= request->getRouterID();
 			byte 		newID		= request->getNewID();
 			uint64_t 	routerPipe	= request->getRouterPipe();
 			_routerPipe				= routerPipe;
+			if (DEBUG) {
+				Serial.print(F("Router id "));
+				Serial.println(routerID);
+				Serial.print(F("New NodeID: "));
+				Serial.println(newID);
+			}
 			request->setCodeOfPipe(0);
 			if (request->incHopCount()) {
 				request->setNodeIDRev(request->getNodeID());		//swap rev and sender
@@ -100,6 +140,7 @@ public:
 		RF24::openReadingPipe(1, nodePipe);
 		setPipe(nodePipe);
 		_nodeID					= newID;
+		saveEEPROM();
 	}
 	
 	void recDeviceFromRouterProcess() {
@@ -137,6 +178,7 @@ public:
 				return;
 			}
 		}
+		resetWork();
 	}
 };
 #endif
